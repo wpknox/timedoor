@@ -1,7 +1,7 @@
 # Author - Willis Knox
 import json
 import requests
-import timedoor_objects as td
+import timedoor.timedoor_objects as td
 from typing import List, Union
 
 
@@ -80,7 +80,7 @@ def auto_arima(dates: List[str], values: List[float], api_key: Union[str, None] 
 
     imputation_window = validate_ma_window_size(imputation_window)
 
-    pass
+    return None
 
 
 def changepoint_detection(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
