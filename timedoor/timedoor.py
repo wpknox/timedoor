@@ -2,15 +2,20 @@
 import json
 import requests
 import timedoor.timedoor_objects as td
-from typing import List, Union
+from typing import Any, Dict, List, Union
 
+# TODO: replace method responses with proper object?
 
 # global variables
-API_KEY: Union[str, None] = None
 BASE_URL: str = 'https://api.timedoor.io'
 API_HEADER_KEY = 'X-Time-Door-Key'
 HEADERS: dict = {}
 
+def run_request(url, json_data) -> Any:
+    return requests.post(url=url, json=json_data, headers=HEADERS).json()
+
+def convert_timeseries_to_data(dates: List[str], values: List[float]) -> Dict[str, float]:
+    return dict(zip(dates, values))
 
 def validate_ma_window_size(size: int):
     if size < 2:
@@ -18,23 +23,16 @@ def validate_ma_window_size(size: int):
     return size
 
 
-def set_api_key(key: str) -> None:
+def set_api_key(key: str) -> bool:
     """Sets the api key for the user if it has not been set already
 
     Args:
         key (str): API key for the user
     """
-    if not key:
-        return
-
-    global API_KEY
-    if key == API_KEY:
-        return
-
-    if key and not API_KEY:
-        API_KEY = key
-        HEADERS[API_HEADER_KEY] = API_KEY
-        return
+    if key:
+        HEADERS[API_HEADER_KEY] = key
+        return True
+    return False
 
 
 def auto_arima(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
@@ -74,13 +72,51 @@ def auto_arima(dates: List[str], values: List[float], api_key: Union[str, None] 
     Returns:
         Union[TimedoorResponse, str]: [description]
     """
-    set_api_key(api_key)
-    if not API_KEY:
+    
+    # check to see if API Key was provided
+    if not set_api_key(api_key):
         return 'api key was not provided!'
-
+    
+    # validate inputs or switch them to default values if they are invalid...
     imputation_window = validate_ma_window_size(imputation_window)
-
-    return None
+    
+    
+    url = BASE_URL+'/invocation/auto-arima'
+    data = convert_timeseries_to_data(dates=dates, values=values)
+    
+    
+    # build json body
+    body = {
+        "stepwise": stepwise,
+        "approximation": approximation,
+        "seasonal": seasonal,
+        "non_stationary": non_stationary,
+        "ic": ic,
+        "box_cox_lambda": box_cox_lambda,
+        "bias_adj": bias_adj,
+        "unit_root_test": unit_root_test,
+        "seasonal_test": seasonal_test,
+        "alpha": alpha,
+        "ci_level": ci_level,
+        "horizon": horizon,
+        "reproduction": reproduction,
+        "precision": {
+            "digits": precision_digits,
+            "method": precision_method
+        },
+        "time_series": [
+            {
+                "data": data,
+                "imputation": {
+                    "method": imputation_method,
+                    "ma_window_size": imputation_window
+                }
+            }
+        ]
+    }
+    
+    r = run_request(url=url, json_data=body)
+    return r
 
 
 def changepoint_detection(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
@@ -94,7 +130,7 @@ def changepoint_detection(dates: List[str], values: List[float], api_key: Union[
 
 
 def changepoint_detection(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
-                          boxcox: td.BoxCox = None, log: td.Log = None, seasonal_diff: td.SeasonalDiff = None, first_diff: td.FirstDiff = None,
+                          boxcox: td.BoxCox = td.BoxCox(), log: td.Log = td.Log(), seasonal_diff: td.SeasonalDiff = td.SeasonalDiff(), first_diff: td.FirstDiff = td.FirstDiff(),
                           reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant',
                           penalty: str = 'mbic', min_distance: int = 1) -> Union[td.TimedoorResponse, str]:
     """Changepoint Detection
@@ -124,12 +160,42 @@ def changepoint_detection(dates: List[str], values: List[float], api_key: Union[
         Union[TimedoorResponse, str]: [description]
     """
 
-    set_api_key(api_key)
-    if not API_KEY:
+    if not set_api_key(api_key):
         return 'api key was not provided!'
-
     imputation_window = validate_ma_window_size(imputation_window)
-    pass
+    
+    url = BASE_URL+'/invocation/changepoint-detection'
+    data = convert_timeseries_to_data(dates=dates, values=values)
+    
+    # build json body
+    body = {
+        "penalty": penalty,
+        "min_distance": min_distance,
+        "reproduction": reproduction,
+        "precision": {
+            "digits": precision_digits,
+            "method": precision_method
+        },
+        "time_series": [
+            {
+                "data": data,
+                "imputation": {
+                    "method": imputation_method,
+                    "ma_window_size": imputation_window
+                },
+                "transformations":
+                    {
+                        "box_cox": boxcox.to_json(),
+                        "log": log.to_json(),
+                        "seasonal_diff": seasonal_diff.to_json(),
+                        "first_diff": first_diff.to_json()
+                    }
+            }
+        ]
+    }
+    
+    r = run_request(url=url, json_data=body)
+    return r
 
 
 def collective_and_point_anomalies(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
@@ -173,8 +239,7 @@ def collective_and_point_anomalies(dates: List[str], values: List[float], api_ke
         Union[TimedoorResponse, str]: [description]
     """
 
-    set_api_key(api_key)
-    if not API_KEY:
+    if not set_api_key(api_key):
         return 'api key was not provided!'
 
     imputation_window = validate_ma_window_size(imputation_window)
@@ -227,8 +292,7 @@ def conditional_heteroskedasticity(dates: List[str], values: List[float], api_ke
         Union[td.TimedoorResponse, str]: [description]
     """
 
-    set_api_key(api_key)
-    if not API_KEY:
+    if not set_api_key(api_key):
         return 'api key was not provided!'
 
     imputation_window = validate_ma_window_size(imputation_window)
@@ -284,8 +348,7 @@ def drift_diffusion_jump(dates: List[str], values: List[float], api_key: Union[s
         Union[td.TimedoorResponse, str]: [description]
     """
 
-    set_api_key(api_key)
-    if not API_KEY:
+    if not set_api_key(api_key):
         return 'api key was not provided!'
 
     imputation_window = validate_ma_window_size(imputation_window)
@@ -335,8 +398,7 @@ def early_warning_signals(dates: List[str], values: List[float], api_key: Union[
         Union[td.TimedoorResponse, str]: [description]
     """
 
-    set_api_key(api_key)
-    if not API_KEY:
+    if not set_api_key(api_key):
         return 'api key was not provided!'
 
     imputation_window = validate_ma_window_size(imputation_window)
@@ -388,8 +450,7 @@ def granger_causality(dates: List[str], values: List[float], api_key: Union[str,
         Union[td.TimedoorResponse, str]: [description]
     """
 
-    set_api_key(api_key)
-    if not API_KEY:
+    if not set_api_key(api_key):
         return 'api key was not provided!'
 
     imputation_window = validate_ma_window_size(imputation_window)
@@ -448,8 +509,7 @@ def matrix_profile(dates: List[str], values: List[float], api_key: Union[str, No
     Returns:
         Union[td.TimedoorResponse, str]: [description]
     """
-    set_api_key(api_key)
-    if not API_KEY:
+    if not set_api_key(api_key):
         return 'api key was not provided!'
 
     imputation_window = validate_ma_window_size(imputation_window)
@@ -497,8 +557,7 @@ def serial_dependence(dates: List[str], values: List[float], api_key: Union[str,
     Returns:
         Union[td.TimedoorResponse, str]: [description]
     """
-    set_api_key(api_key)
-    if not API_KEY:
+    if not set_api_key(api_key):
         return 'api key was not provided!'
 
     imputation_window = validate_ma_window_size(imputation_window)
@@ -548,8 +607,7 @@ def spectral_density(dates: List[str], values: List[float], api_key: Union[str, 
     Returns:
         Union[td.TimedoorResponse, str]: [description]
     """
-    set_api_key(api_key)
-    if not API_KEY:
+    if not set_api_key(api_key):
         return 'api key was not provided!'
 
     imputation_window = validate_ma_window_size(imputation_window)
@@ -599,8 +657,7 @@ def spectral_entropy(dates: List[str], values: List[float], api_key: Union[str, 
         Union[td.TimedoorResponse, str]: [description]
     """
 
-    set_api_key(api_key)
-    if not API_KEY:
+    if not set_api_key(api_key):
         return 'api key was not provided!'
 
     imputation_window = validate_ma_window_size(imputation_window)

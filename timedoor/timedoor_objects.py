@@ -1,5 +1,6 @@
 from typing import Union
 
+# TODO make all objects JSON Seralizeable
 class BoxCox:
     def __init__(self, apply: bool = False, lam: Union[str, float] = 'auto',
                  method: str = 'guerrero', upper: float = 2, lower: float = -1) -> None:
@@ -21,6 +22,9 @@ class BoxCox:
             self.lower = -1
         if self.method.lower() != 'guerrero' or self.method.lower() != 'log_lik':
             self.method = 'guerrero'
+    
+    def to_json(self):
+        return self.__dict__
 
 
 class Log:
@@ -37,10 +41,16 @@ class Log:
             self.constant = 0.0001
         if self.factor and self.factor < 0.0001:
             self.factor = 0.0001
-        if self.base < 2:
-            self.base = 2
-        if self.base > 10:
-            self.base = 10
+        if isinstance(self.base, int):
+            if self.base < 2:
+                self.base = 2
+            if self.base > 10:
+                self.base = 10
+        elif self.base != 'e':
+            self.base = 'e'
+    
+    def to_json(self):
+        return self.__dict__
 
 
 class SeasonalDiff:
@@ -71,6 +81,9 @@ class SeasonalDiff:
             self.alpha = 0.01
         elif self.alpha > 0.1:
             self.alpha = 0.1
+    
+    def to_json(self):
+        return self.__dict__
 
 
 class FirstDiff:
@@ -105,6 +118,9 @@ class FirstDiff:
             self.alpha = 0.01
         elif self.alpha > 0.1:
             self.alpha = 0.1
+    
+    def to_json(self):
+        return self.__dict__
 
 
 class TimedoorTransformation:
@@ -120,13 +136,13 @@ class TimedoorReproduction:
 
 
 class TimedoorResponse:
-    def __init__(self, computation_time, reproduction, data) -> None:
+    def __init__(self, computation_time, reproduction = None, data = None) -> None:
         self.computation_time: float = computation_time
         self.reproduction: TimedoorReproduction = reproduction
         self.data = data
 
     def __str__(self) -> str:
-        return f'Response: Computation Time: {self.computation_time},\tReproduction: {self.reproduction},\tData: {self.data}'
+        return f'Response: {self.computation_time}, {self.reproduction}, {self.data}'
 
 
 def main():
