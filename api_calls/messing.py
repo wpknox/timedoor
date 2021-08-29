@@ -16,7 +16,7 @@ def try_arima():
         date, '%d/%m/%Y%H.%M.%S').isoformat() + 'Z' for date in datetimes]
     vals = list(df["PT08.S5(O3)"])
     arima = timedoor.auto_arima(
-        dates=valid_datetimes, values=vals, api_key=api_key)
+        dates=valid_datetimes, values=vals, api_key=api_key, error_value=0)
     print(arima)
 
 
@@ -27,7 +27,7 @@ def try_changepoint():
         date, '%d/%m/%Y%H.%M.%S').isoformat() + 'Z' for date in datetimes]
     vals = list(df["PT08.S5(O3)"])
     change_point = timedoor.changepoint_detection(
-        dates=valid_datetimes, values=vals, api_key=api_key)
+        dates=valid_datetimes, values=vals, api_key=api_key, error_value=-200)
     print(change_point)
 
 
