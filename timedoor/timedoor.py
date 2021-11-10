@@ -1,36 +1,142 @@
 # Author - Willis Knox
 import requests
-import timedoor.timedoor_objects as td
 from typing import Dict, List, Tuple, Union
+from dataclasses import dataclass
 
-# TODO: replace method responses with proper object?
+@dataclass
+class BoxCox:
+    apply: bool = False
+    lam: Union[str, float] = 'auto'
+    method: str = 'guerrero'
+    upper: float = 2
+    lower: float = -1
+
+    def validate_inputs(self):
+        if isinstance(self.lam, str):
+            if self.lam.lower() != 'auto':
+                self.lam = 'auto'
+            self.upper = 2
+            self.lower = -1
+        if self.method.lower() != 'guerrero' or self.method.lower() != 'log_lik':
+            self.method = 'guerrero'
+
+    def to_json(self):
+        json = self.__dict__
+        json["lambda"] = json.pop("lam")
+        return json
+
+@dataclass
+class Log:
+    apply: bool = False
+    base: Union[str, int] = 'e'
+    constant: float = 1
+    factor: Union[None, float] = None
+
+    def validate_inputs(self):
+        if self.constant < 0.0001:
+            self.constant = 0.0001
+        if self.factor and self.factor < 0.0001:
+            self.factor = 0.0001
+        if isinstance(self.base, int):
+            if self.base < 2:
+                self.base = 2
+            if self.base > 10:
+                self.base = 10
+        elif self.base != 'e':
+            self.base = 'e'
+
+    def to_json(self):
+        return self.__dict__
+
+@dataclass
+class SeasonalDiff:
+    apply: bool = False
+    period: Union[str, int] = 'auto'
+    n_diffs: Union[str, int] = 'auto'
+    test: str = 'ss'
+    alpha: float = 0.05
+
+    def validate_inputs(self):
+        if isinstance(self.period, str) and self.period != 'auto':
+            self.period = 'auto'
+        if isinstance(self.period, int) and self.period < 2:
+            self.period = 2
+        if isinstance(self.n_diffs, str) and self.n_diffs != 'auto':
+            self.period = 'auto'
+        if isinstance(self.n_diffs, int):
+            if self.n_diffs < 1:
+                self.n_diffs = 1
+            elif self.n_diffs > 3:
+                self.n_diffs = 3
+        if self.test not in ['ss', 'ch', 'hegy', 'ocsb']:
+            self.test = 'ss'
+        if self.alpha < 0.01:
+            self.alpha = 0.01
+        elif self.alpha > 0.1:
+            self.alpha = 0.1
+
+    def to_json(self):
+        return self.__dict__
+
+
+@dataclass
+class FirstDiff:
+    apply: bool = False
+    n_diffs: Union[str, int] = 'auto'
+    test: str = 'kpss'
+    type: str = 'level'
+    alpha: float = 0.05
+
+    def validate_inputs(self):
+        if isinstance(self.n_diffs, str) and self.n_diffs != 'auto':
+            self.period = 'auto'
+        if isinstance(self.n_diffs, int):
+            if self.n_diffs < 1:
+                self.n_diffs = 1
+            elif self.n_diffs > 3:
+                self.n_diffs = 3
+        if self.test not in ['kpss', 'adf', 'pp']:
+            self.test = 'kpss'
+        if self.type not in ['level', 'trend']:
+            self.type = 'level'
+        if self.alpha < 0.01:
+            self.alpha = 0.01
+        elif self.alpha > 0.1:
+            self.alpha = 0.1
+
+    def to_json(self):
+        return self.__dict__
+
+@dataclass
+class TimedoorTransformation:
+    boxcox: BoxCox
+    log: Log
+    seasonal_diff: SeasonalDiff
+    first_diff: FirstDiff
 
 # global variables
-BASE_URL: str = 'https://api.timedoor.io'
+BASE_URL: str = 'https://api.timedoor.io/invocation/'
 API_HEADER_KEY = 'X-Time-Door-Key'
 HEADERS: dict = {}
 
-
-def run_request(url, json_data) -> Tuple[int, dict]:
+def __run_request(url, json_data) -> Tuple[int, dict]:
     r = requests.post(url=url, json=json_data, headers=HEADERS)
     return (r.status_code, r.json())
 
-
-def convert_timeseries_to_data(dates: List[str], values: List[float]) -> Dict[str, float]:
+def __convert_timeseries_to_data(dates: List[str], values: List[float]) -> Dict[str, float]:
     return dict(zip(dates, values))
 
-
-def clean_values(values, error_val: Union[int ,float] = None) -> list:
-    if not error_val: return values
+def __clean_values(values, error_val: Union[int, float] = None) -> list:
+    if not error_val:
+        return values
     return [value if value != error_val else None for value in values]
 
-
-def validate_ma_window_size(size: int):
+def __validate_ma_window_size(size: int):
     if size < 2:
         return 2
     return size
 
-def set_api_key(key: str) -> bool:
+def __set_api_key(key: str) -> bool:
     """Sets the api key for the user if it has not been set already
 
     Args:
@@ -82,14 +188,14 @@ def auto_arima(dates: List[str], values: List[float], api_key: Union[str, None] 
     """
 
     # check to see if API Key was provided
-    if not set_api_key(api_key):
+    if not __set_api_key(api_key):
         return (400, {"message": 'api key was not provided!'})
-    values = clean_values(values=values, error_val=error_value)
-    imputation_window = validate_ma_window_size(imputation_window)
+    values = __clean_values(values=values, error_val=error_value)
+    imputation_window = __validate_ma_window_size(imputation_window)
 
-    url = BASE_URL+'/invocation/auto-arima'
-    data = convert_timeseries_to_data(dates=dates, values=values)
-    
+    url = BASE_URL + 'auto-arima'
+    data = __convert_timeseries_to_data(dates=dates, values=values)
+
     # build json body
     body = {
         "stepwise": stepwise,
@@ -120,12 +226,11 @@ def auto_arima(dates: List[str], values: List[float], api_key: Union[str, None] 
         ]
     }
 
-    r = run_request(url=url, json_data=body)
-    return r
+    return __run_request(url=url, json_data=body)
 
 
 def changepoint_detection(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
-                          error_value: Union[int, None] = None, transformation: td.TimedoorTransformation = None, reproduction: bool = False,
+                          error_value: Union[int, None] = None, transformation: TimedoorTransformation = None, reproduction: bool = False,
                           precision_digits: int = 4, precision_method: str = 'significant', penalty: str = 'mbic', min_distance: int = 1) -> Tuple[int, dict]:
 
     return changepoint_detection(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
@@ -135,8 +240,8 @@ def changepoint_detection(dates: List[str], values: List[float], api_key: Union[
 
 
 def changepoint_detection(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
-                          error_value: Union[int, None] = None, boxcox: td.BoxCox = td.BoxCox(), log: td.Log = td.Log(),
-                          seasonal_diff: td.SeasonalDiff = td.SeasonalDiff(), first_diff: td.FirstDiff = td.FirstDiff(),
+                          error_value: Union[int, None] = None, boxcox: BoxCox = BoxCox(), log: Log = Log(),
+                          seasonal_diff: SeasonalDiff = SeasonalDiff(), first_diff: FirstDiff = FirstDiff(),
                           reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant',
                           penalty: str = 'mbic', min_distance: int = 1) -> Tuple[int, dict]:
     """Changepoint Detection
@@ -167,14 +272,14 @@ def changepoint_detection(dates: List[str], values: List[float], api_key: Union[
         Tuple[int, dict]: [description]
     """
 
-    if not set_api_key(api_key):
+    if not __set_api_key(api_key):
         return (400, {"message": 'api key was not provided!'})
 
-    values = clean_values(values=values, error_val=error_value)
-    imputation_window = validate_ma_window_size(imputation_window)
+    values = __clean_values(values=values, error_val=error_value)
+    imputation_window = __validate_ma_window_size(imputation_window)
 
-    url = BASE_URL+'/invocation/changepoint-detection'
-    data = convert_timeseries_to_data(dates=dates, values=values)
+    url = BASE_URL+'changepoint-detection'
+    data = __convert_timeseries_to_data(dates=dates, values=values)
 
     # build json body
     body = {
@@ -192,8 +297,7 @@ def changepoint_detection(dates: List[str], values: List[float], api_key: Union[
                     "method": imputation_method,
                     "ma_window_size": imputation_window
                 },
-                "transformations":
-                    {
+                "transformations": {
                         "box_cox": boxcox.to_json(),
                         "log": log.to_json(),
                         "seasonal_diff": seasonal_diff.to_json(),
@@ -203,13 +307,12 @@ def changepoint_detection(dates: List[str], values: List[float], api_key: Union[
         ]
     }
 
-    r = run_request(url=url, json_data=body)
-    return r
+    return __run_request(url=url, json_data=body)
 
 
 def collective_and_point_anomalies(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                                    error_value: Union[int, None] = None,
-                                   transformation: td.TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
+                                   transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
                                    precision_method: str = 'significant', method: str = 'mean_var', min_ca_size: int = 10) -> Tuple[int, dict]:
 
     return collective_and_point_anomalies(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
@@ -220,7 +323,7 @@ def collective_and_point_anomalies(dates: List[str], values: List[float], api_ke
 
 def collective_and_point_anomalies(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                                    error_value: Union[int, None] = None,
-                                   boxcox: td.BoxCox = None, log: td.Log = None, seasonal_diff: td.SeasonalDiff = None, first_diff: td.FirstDiff = None,
+                                   boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
                                    reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant',
                                    method: str = 'mean_var', min_ca_size: int = 10) -> Tuple[int, dict]:
     """Anomaly Detection
@@ -250,29 +353,58 @@ def collective_and_point_anomalies(dates: List[str], values: List[float], api_ke
         Tuple[int, dict]: [description]
     """
 
-    if not set_api_key(api_key):
+    if not __set_api_key(api_key):
         return (400, {"message": 'api key was not provided!'})
+
+    values = __clean_values(values=values, error_val=error_value)
+    imputation_window = __validate_ma_window_size(imputation_window)
     
-    values = clean_values(values=values, error_val=error_value)
-    imputation_window = validate_ma_window_size(imputation_window)
+    url = BASE_URL+'collective-and-point-anomalies'
+    data = __convert_timeseries_to_data(dates=dates, values=values)
+    
+    # build json body
+    body = {
+        "method": method,
+        "min_ca_size": min_ca_size,
+        "reproduction": reproduction,
+        "precision": {
+            "digits": precision_digits,
+            "method": precision_method
+        },
+        "time_series": [
+            {
+                "data": data,
+                "imputation": {
+                    "method": imputation_method,
+                    "ma_window_size": imputation_window
+                },
+                "transformations": {
+                        "box_cox": boxcox.to_json(),
+                        "log": log.to_json(),
+                        "seasonal_diff": seasonal_diff.to_json(),
+                        "first_diff": first_diff.to_json()
+                }
+            }
+        ]
+    }
+    
+    return __run_request(url=url, json_data=body)
 
-    pass
 
-
-def conditional_heteroskedasticity(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
-                                   error_value: Union[int, None] = None,
-                                   transformation: td.TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
+def conditional_heteroskedasticity(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear',
+                                   imputation_window: int = 10, error_value: Union[int, None] = None,
+                                   transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
                                    precision_method: str = 'significant', alpha: float = 0.05, window_size: int = 10) -> Tuple[int, dict]:
 
-    return conditional_heteroskedasticity(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
-                                          boxcox=transformation.boxcox, log=transformation.log, seasonal_diff=transformation.seasonal_diff,
-                                          first_diff=transformation.first_diff, reproduction=reproduction,
+    return conditional_heteroskedasticity(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window,
+                                          error_value=error_value, boxcox=transformation.boxcox, log=transformation.log,
+                                          seasonal_diff=transformation.seasonal_diff, first_diff=transformation.first_diff, reproduction=reproduction,
                                           precision_digits=precision_digits, precision_method=precision_method, alpha=alpha, window_size=window_size)
 
 
-def conditional_heteroskedasticity(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
-                                   error_value: Union[int, None] = None,
-                                   boxcox: td.BoxCox = None, log: td.Log = None, seasonal_diff: td.SeasonalDiff = None, first_diff: td.FirstDiff = None,
+def conditional_heteroskedasticity(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear',
+                                   imputation_window: int = 10, error_value: Union[int, None] = None,
+                                   boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
                                    reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant',
                                    alpha: float = 0.05, window_size: int = 10) -> Tuple[int, dict]:
     """Early Warning Signal Detection
@@ -292,10 +424,10 @@ def conditional_heteroskedasticity(dates: List[str], values: List[float], api_ke
         api_key (Union[str, None], optional): [description]. Defaults to None.
         imputation_method (str, optional): [description]. Defaults to 'linear'.
         imputation_window (int, optional): [description]. Defaults to 10.
-        boxcox (td.BoxCox, optional): [description]. Defaults to None.
-        log (td.Log, optional): [description]. Defaults to None.
-        seasonal_diff (td.SeasonalDiff, optional): [description]. Defaults to None.
-        first_diff (td.FirstDiff, optional): [description]. Defaults to None.
+        boxcox (BoxCox, optional): [description]. Defaults to None.
+        log (Log, optional): [description]. Defaults to None.
+        seasonal_diff (SeasonalDiff, optional): [description]. Defaults to None.
+        first_diff (FirstDiff, optional): [description]. Defaults to None.
         reproduction (bool, optional): [description]. Defaults to False.
         precision_digits (int, optional): [description]. Defaults to 4.
         precision_method (str, optional): [description]. Defaults to 'significant'.
@@ -303,21 +435,50 @@ def conditional_heteroskedasticity(dates: List[str], values: List[float], api_ke
         window_size (int, optional): [description]. Defaults to 10.
 
     Returns:
-        Union[td.TimedoorResponse, str]: [description]
+        Tuple[int, dict]: [description]
     """
 
-    if not set_api_key(api_key):
+    if not __set_api_key(api_key):
         return (400, {"message": 'api key was not provided!'})
 
-    values = clean_values(values=values, error_val=error_value)
-    imputation_window = validate_ma_window_size(imputation_window)
+    values = __clean_values(values=values, error_val=error_value)
+    imputation_window = __validate_ma_window_size(imputation_window)
+    
+    url = BASE_URL+'conditional-heteroskedasticity'
+    data = __convert_timeseries_to_data(dates=dates, values=values)
+    
+    # build json body
+    body = {
+        "alpha": alpha,
+        "window_size": window_size,
+        "reproduction": reproduction,
+        "precision": {
+            "digits": precision_digits,
+            "method": precision_method
+        },
+        "time_series": [
+            {
+                "data": data,
+                "imputation": {
+                    "method": imputation_method,
+                    "ma_window_size": imputation_window
+                },
+                "transformations": {
+                        "box_cox": boxcox.to_json(),
+                        "log": log.to_json(),
+                        "seasonal_diff": seasonal_diff.to_json(),
+                        "first_diff": first_diff.to_json()
+                }
+            }
+        ]
+    }
 
-    pass
+    return __run_request(url=url, json_data=body)
 
 
 def drift_diffusion_jump(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                          error_value: Union[int, None] = None,
-                         transformation: td.TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
+                         transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
                          precision_method: str = 'significant', kernel_bandwidth_factor: float = 0.6, kernel_points: int = 500) -> Tuple[int, dict]:
 
     return drift_diffusion_jump(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
@@ -328,7 +489,7 @@ def drift_diffusion_jump(dates: List[str], values: List[float], api_key: Union[s
 
 def drift_diffusion_jump(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                          error_value: Union[int, None] = None,
-                         boxcox: td.BoxCox = None, log: td.Log = None, seasonal_diff: td.SeasonalDiff = None, first_diff: td.FirstDiff = None,
+                         boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
                          reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant',
                          kernel_bandwidth_factor: float = 0.6, kernel_points: int = 500) -> Tuple[int, dict]:
     """Early Warning Signal Detection
@@ -351,10 +512,10 @@ def drift_diffusion_jump(dates: List[str], values: List[float], api_key: Union[s
         api_key (Union[str, None], optional): [description]. Defaults to None.
         imputation_method (str, optional): [description]. Defaults to 'linear'.
         imputation_window (int, optional): [description]. Defaults to 10.
-        boxcox (td.BoxCox, optional): [description]. Defaults to None.
-        log (td.Log, optional): [description]. Defaults to None.
-        seasonal_diff (td.SeasonalDiff, optional): [description]. Defaults to None.
-        first_diff (td.FirstDiff, optional): [description]. Defaults to None.
+        boxcox (BoxCox, optional): [description]. Defaults to None.
+        log (Log, optional): [description]. Defaults to None.
+        seasonal_diff (SeasonalDiff, optional): [description]. Defaults to None.
+        first_diff (FirstDiff, optional): [description]. Defaults to None.
         reproduction (bool, optional): [description]. Defaults to False.
         precision_digits (int, optional): [description]. Defaults to 4.
         precision_method (str, optional): [description]. Defaults to 'significant'.
@@ -362,22 +523,50 @@ def drift_diffusion_jump(dates: List[str], values: List[float], api_key: Union[s
         kernel_points (int, optional): [description]. Defaults to 500.
 
     Returns:
-        Union[td.TimedoorResponse, str]: [description]
+        Tuple[int, dict]: [description]
     """
 
-    if not set_api_key(api_key):
+    if not __set_api_key(api_key):
         return (400, {"message": 'api key was not provided!'})
 
-    values = clean_values(values=values, error_val=error_value)
+    values = __clean_values(values=values, error_val=error_value)
+    imputation_window = __validate_ma_window_size(imputation_window)
 
-    imputation_window = validate_ma_window_size(imputation_window)
+    url = BASE_URL+'drift-diffusion-jump'
+    data = __convert_timeseries_to_data(dates=dates, values=values)
+    
+    # build json body
+    body = {
+        "kernel_bandwidth_factor": kernel_bandwidth_factor,
+        "kernel_points": kernel_points,
+        "reproduction": reproduction,
+        "precision": {
+            "digits": precision_digits,
+            "method": precision_method
+        },
+        "time_series": [
+            {
+                "data": data,
+                "imputation": {
+                    "method": imputation_method,
+                    "ma_window_size": imputation_window
+                },
+                "transformations": {
+                        "box_cox": boxcox.to_json(),
+                        "log": log.to_json(),
+                        "seasonal_diff": seasonal_diff.to_json(),
+                        "first_diff": first_diff.to_json()
+                }
+            }
+        ]
+    }
 
-    pass
+    return __run_request(url=url, json_data=body)
 
 
 def early_warning_signals(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                           error_value: Union[int, None] = None,
-                          transformation: td.TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
+                          transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
                           precision_method: str = 'significant', method: str = 'acf1', window_size: int = 10) -> Tuple[int, dict]:
 
     return early_warning_signals(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
@@ -388,7 +577,7 @@ def early_warning_signals(dates: List[str], values: List[float], api_key: Union[
 
 def early_warning_signals(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                           error_value: Union[int, None] = None,
-                          boxcox: td.BoxCox = None, log: td.Log = None, seasonal_diff: td.SeasonalDiff = None, first_diff: td.FirstDiff = None,
+                          boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
                           reproduction: bool = False, precision_digits: int = 4,
                           precision_method: str = 'significant', method: str = 'acf1', window_size: int = 10) -> Tuple[int, dict]:
     """Early Warning Signal Detection
@@ -405,10 +594,10 @@ def early_warning_signals(dates: List[str], values: List[float], api_key: Union[
         api_key (Union[str, None], optional): [description]. Defaults to None.
         imputation_method (str, optional): [description]. Defaults to 'linear'.
         imputation_window (int, optional): [description]. Defaults to 10.
-        boxcox (td.BoxCox, optional): [description]. Defaults to None.
-        log (td.Log, optional): [description]. Defaults to None.
-        seasonal_diff (td.SeasonalDiff, optional): [description]. Defaults to None.
-        first_diff (td.FirstDiff, optional): [description]. Defaults to None.
+        boxcox (BoxCox, optional): [description]. Defaults to None.
+        log (Log, optional): [description]. Defaults to None.
+        seasonal_diff (SeasonalDiff, optional): [description]. Defaults to None.
+        first_diff (FirstDiff, optional): [description]. Defaults to None.
         reproduction (bool, optional): [description]. Defaults to False.
         precision_digits (int, optional): [description]. Defaults to 4.
         precision_method (str, optional): [description]. Defaults to 'significant'.
@@ -416,22 +605,50 @@ def early_warning_signals(dates: List[str], values: List[float], api_key: Union[
         window_size (int, optional): [description]. Defaults to 10.
 
     Returns:
-        Union[td.TimedoorResponse, str]: [description]
+        Tuple[int, dict]: [description]
     """
 
-    if not set_api_key(api_key):
+    if not __set_api_key(api_key):
         return (400, {"message": 'api key was not provided!'})
 
-    values = clean_values(values=values, error_val=error_value)
+    values = __clean_values(values=values, error_val=error_value)
+    imputation_window = __validate_ma_window_size(imputation_window)
 
-    imputation_window = validate_ma_window_size(imputation_window)
+    url = BASE_URL+'early-warning-signals'
+    data = __convert_timeseries_to_data(dates=dates, values=values)
+    
+    # build json body
+    body = {
+        "method": method,
+        "window_size": window_size,
+        "reproduction": reproduction,
+        "precision": {
+            "digits": precision_digits,
+            "method": precision_method
+        },
+        "time_series": [
+            {
+                "data": data,
+                "imputation": {
+                    "method": imputation_method,
+                    "ma_window_size": imputation_window
+                },
+                "transformations": {
+                        "box_cox": boxcox.to_json(),
+                        "log": log.to_json(),
+                        "seasonal_diff": seasonal_diff.to_json(),
+                        "first_diff": first_diff.to_json()
+                }
+            }
+        ]
+    }
 
-    pass
+    return __run_request(url=url, json_data=body)
 
 
 def granger_causality(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                       error_value: Union[int, None] = None,
-                      transformation: td.TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
+                      transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
                       precision_method: str = 'significant', alpha: float = 0.05, gamma: float = 0.5) -> Tuple[int, dict]:
 
     return granger_causality(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
@@ -442,7 +659,7 @@ def granger_causality(dates: List[str], values: List[float], api_key: Union[str,
 
 def granger_causality(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                       error_value: Union[int, None] = None,
-                      boxcox: td.BoxCox = None, log: td.Log = None, seasonal_diff: td.SeasonalDiff = None, first_diff: td.FirstDiff = None,
+                      boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
                       reproduction: bool = False, precision_digits: int = 4,
                       precision_method: str = 'significant', alpha: float = 0.05, gamma: float = 0.5) -> Tuple[int, dict]:
     """Causality Inference
@@ -461,10 +678,10 @@ def granger_causality(dates: List[str], values: List[float], api_key: Union[str,
         api_key (Union[str, None], optional): [description]. Defaults to None.
         imputation_method (str, optional): [description]. Defaults to 'linear'.
         imputation_window (int, optional): [description]. Defaults to 10.
-        boxcox (td.BoxCox, optional): [description]. Defaults to None.
-        log (td.Log, optional): [description]. Defaults to None.
-        seasonal_diff (td.SeasonalDiff, optional): [description]. Defaults to None.
-        first_diff (td.FirstDiff, optional): [description]. Defaults to None.
+        boxcox (BoxCox, optional): [description]. Defaults to None.
+        log (Log, optional): [description]. Defaults to None.
+        seasonal_diff (SeasonalDiff, optional): [description]. Defaults to None.
+        first_diff (FirstDiff, optional): [description]. Defaults to None.
         reproduction (bool, optional): [description]. Defaults to False.
         precision_digits (int, optional): [description]. Defaults to 4.
         precision_method (str, optional): [description]. Defaults to 'significant'.
@@ -472,37 +689,41 @@ def granger_causality(dates: List[str], values: List[float], api_key: Union[str,
         gamma (float, optional): [description]. Defaults to 0.5.
 
     Returns:
-        Union[td.TimedoorResponse, str]: [description]
+        Tuple[int, dict]: [description]
     """
 
-    if not set_api_key(api_key):
+    # TODO: Fix this method... uses two data sets not one...
+
+    if not __set_api_key(api_key):
         return (400, {"message": 'api key was not provided!'})
 
-    values = clean_values(values=values, error_val=error_value)
-
-    imputation_window = validate_ma_window_size(imputation_window)
+    values = __clean_values(values=values, error_val=error_value)
+    imputation_window = __validate_ma_window_size(imputation_window)
 
     pass
 
 
 def matrix_profile(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                    error_value: Union[int, None] = None,
-                   transformation: td.TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
+                   transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
                    precision_method: str = 'significant', method: str = 'stomp', window_size: int = 10, exclusion_factor: float = 0.5,
-                   neighbor_exclusion_radius: int = 3, n_motifs: int = 3, n_motifs_neighbors: int = 3) -> Tuple[int, dict]:
+                   neighbor_exclusion_radius: int = 3, n_motifs: int = 3, n_motifs_neighbors: int = 10,
+                   n_discords: int = 1, n_discord_neighbors: int = 3) -> Tuple[int, dict]:
 
     return matrix_profile(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
                           boxcox=transformation.boxcox, log=transformation.log, seasonal_diff=transformation.seasonal_diff,
                           first_diff=transformation.first_diff, reproduction=reproduction, precision_digits=precision_digits,
                           precision_method=precision_method, method=method, window_size=window_size, exclusion_factor=exclusion_factor,
-                          neighbor_exclusion_radius=neighbor_exclusion_radius, n_motifs=n_motifs, n_motifs_neighbors=n_motifs_neighbors)
+                          neighbor_exclusion_radius=neighbor_exclusion_radius, n_motifs=n_motifs,
+                          n_motifs_neighbors=n_motifs_neighbors, n_discords=n_discords, n_discord_neighbors=n_discord_neighbors)
 
 
 def matrix_profile(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                    error_value: Union[int, None] = None,
-                   boxcox: td.BoxCox = None, log: td.Log = None, seasonal_diff: td.SeasonalDiff = None, first_diff: td.FirstDiff = None,
+                   boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
                    reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant', method: str = 'stomp', window_size: int = 10,
-                   exclusion_factor: float = 0.5, neighbor_exclusion_radius: int = 3, n_motifs: int = 3, n_motifs_neighbors: int = 3) -> Tuple[int, dict]:
+                   exclusion_factor: float = 0.5, neighbor_exclusion_radius: int = 3, n_motifs: int = 3, n_motifs_neighbors: int = 10,
+                   n_discords: int = 1, n_discord_neighbors: int = 3) -> Tuple[int, dict]:
     """Recurring Pattern Detection | Anomaly Detection | Chain Detection
 
     univariate | nonparametric | fast data
@@ -521,10 +742,10 @@ def matrix_profile(dates: List[str], values: List[float], api_key: Union[str, No
         api_key (Union[str, None], optional): [description]. Defaults to None.
         imputation_method (str, optional): [description]. Defaults to 'linear'.
         imputation_window (int, optional): [description]. Defaults to 10.
-        boxcox (td.BoxCox, optional): [description]. Defaults to None.
-        log (td.Log, optional): [description]. Defaults to None.
-        seasonal_diff (td.SeasonalDiff, optional): [description]. Defaults to None.
-        first_diff (td.FirstDiff, optional): [description]. Defaults to None.
+        boxcox (BoxCox, optional): [description]. Defaults to None.
+        log (Log, optional): [description]. Defaults to None.
+        seasonal_diff (SeasonalDiff, optional): [description]. Defaults to None.
+        first_diff (FirstDiff, optional): [description]. Defaults to None.
         reproduction (bool, optional): [description]. Defaults to False.
         precision_digits (int, optional): [description]. Defaults to 4.
         precision_method (str, optional): [description]. Defaults to 'significant'.
@@ -536,20 +757,55 @@ def matrix_profile(dates: List[str], values: List[float], api_key: Union[str, No
         n_motifs_neighbors (int, optional): [description]. Defaults to 3.
 
     Returns:
-        Union[td.TimedoorResponse, str]: [description]
+        Tuple[int, dict]: [description]
     """
-    if not set_api_key(api_key):
+    if not __set_api_key(api_key):
         return (400, {"message": 'api key was not provided!'})
 
-    values = clean_values(values=values, error_val=error_value)
+    values = __clean_values(values=values, error_val=error_value)
+    imputation_window = __validate_ma_window_size(imputation_window)
+    
+    url = BASE_URL+'matrix-profile'
+    data = __convert_timeseries_to_data(dates=dates, values=values)
+    
+    # build json body
+    body = {
+        "method": method,
+        "window_size": window_size,
+        "exclusion_factor": exclusion_factor,
+        "neighbor_exclusion_radius": neighbor_exclusion_radius,
+        "n_motifs": n_motifs,
+        "n_motifs_neighbors": n_motifs_neighbors,
+        "n_discords": n_discords,
+        "n_discord_neighbors": n_discord_neighbors,
+        "reproduction": reproduction,
+        "precision": {
+            "digits": precision_digits,
+            "method": precision_method
+        },
+        "time_series": [
+            {
+                "data": data,
+                "imputation": {
+                    "method": imputation_method,
+                    "ma_window_size": imputation_window
+                },
+                "transformations": {
+                        "box_cox": boxcox.to_json(),
+                        "log": log.to_json(),
+                        "seasonal_diff": seasonal_diff.to_json(),
+                        "first_diff": first_diff.to_json()
+                }
+            }
+        ]
+    }
 
-    imputation_window = validate_ma_window_size(imputation_window)
-    pass
+    return __run_request(url=url, json_data=body)
 
 
 def serial_dependence(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                       error_value: Union[int, None] = None,
-                      transformation: td.TimedoorTransformation = None, reproduction: bool = False,
+                      transformation: TimedoorTransformation = None, reproduction: bool = False,
                       precision_digits: int = 4, precision_method: str = 'significant', method: str = 'acf',
                       max_lag: Union[str, float] = '10*10log10(n)', alpha: float = 0.05) -> Tuple[int, dict]:
 
@@ -561,7 +817,7 @@ def serial_dependence(dates: List[str], values: List[float], api_key: Union[str,
 
 def serial_dependence(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                       error_value: Union[int, None] = None,
-                      boxcox: td.BoxCox = None, log: td.Log = None, seasonal_diff: td.SeasonalDiff = None, first_diff: td.FirstDiff = None,
+                      boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
                       reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant', method: str = 'acf',
                       max_lag: Union[str, float] = '10*10log10(n)', alpha: float = 0.05) -> Tuple[int, dict]:
     """Serial Dependency Detection
@@ -576,10 +832,10 @@ def serial_dependence(dates: List[str], values: List[float], api_key: Union[str,
         api_key (Union[str, None], optional): [description]. Defaults to None.
         imputation_method (str, optional): [description]. Defaults to 'linear'.
         imputation_window (int, optional): [description]. Defaults to 10.
-        boxcox (td.BoxCox, optional): [description]. Defaults to None.
-        log (td.Log, optional): [description]. Defaults to None.
-        seasonal_diff (td.SeasonalDiff, optional): [description]. Defaults to None.
-        first_diff (td.FirstDiff, optional): [description]. Defaults to None.
+        boxcox (BoxCox, optional): [description]. Defaults to None.
+        log (Log, optional): [description]. Defaults to None.
+        seasonal_diff (SeasonalDiff, optional): [description]. Defaults to None.
+        first_diff (FirstDiff, optional): [description]. Defaults to None.
         reproduction (bool, optional): [description]. Defaults to False.
         precision_digits (int, optional): [description]. Defaults to 4.
         precision_method (str, optional): [description]. Defaults to 'significant'.
@@ -588,21 +844,50 @@ def serial_dependence(dates: List[str], values: List[float], api_key: Union[str,
         alpha (float, optional): [description]. Defaults to 0.05.
 
     Returns:
-        Union[td.TimedoorResponse, str]: [description]
+        Tuple[int, dict]: [description]
     """
-    if not set_api_key(api_key):
+    if not __set_api_key(api_key):
         return (400, {"message": 'api key was not provided!'})
 
-    values = clean_values(values=values, error_val=error_value)
+    values = __clean_values(values=values, error_val=error_value)
+    imputation_window = __validate_ma_window_size(imputation_window)
 
-    imputation_window = validate_ma_window_size(imputation_window)
+    url = BASE_URL+'serial-dependence'
+    data = __convert_timeseries_to_data(dates=dates, values=values)
+    
+    # build json body
+    body = {
+        "method": method,
+        "max_lag": max_lag,
+        "alpha": alpha,
+        "reproduction": reproduction,
+        "precision": {
+            "digits": precision_digits,
+            "method": precision_method
+        },
+        "time_series": [
+            {
+                "data": data,
+                "imputation": {
+                    "method": imputation_method,
+                    "ma_window_size": imputation_window
+                },
+                "transformations": {
+                        "box_cox": boxcox.to_json(),
+                        "log": log.to_json(),
+                        "seasonal_diff": seasonal_diff.to_json(),
+                        "first_diff": first_diff.to_json()
+                }
+            }
+        ]
+    }
 
-    pass
+    return __run_request(url=url, json_data=body)
 
 
 def spectral_density(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                      error_value: Union[int, None] = None,
-                     transformation: td.TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
+                     transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
                      precision_method: str = 'significant', method: str = 'direct', taper: str = 'rectangle',
                      center: bool = True, conversion: Union[None, str] = None) -> Tuple[int, dict]:
 
@@ -614,7 +899,7 @@ def spectral_density(dates: List[str], values: List[float], api_key: Union[str, 
 
 def spectral_density(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                      error_value: Union[int, None] = None,
-                     boxcox: td.BoxCox = None, log: td.Log = None, seasonal_diff: td.SeasonalDiff = None, first_diff: td.FirstDiff = None,
+                     boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
                      reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant', method: str = 'direct',
                      taper: str = 'rectangle', center: bool = True, conversion: Union[None, str] = None) -> Tuple[int, dict]:
     """Spectral Analysis
@@ -629,10 +914,10 @@ def spectral_density(dates: List[str], values: List[float], api_key: Union[str, 
         api_key (Union[str, None], optional): [description]. Defaults to None.
         imputation_method (str, optional): [description]. Defaults to 'linear'.
         imputation_window (int, optional): [description]. Defaults to 10.
-        boxcox (td.BoxCox, optional): [description]. Defaults to None.
-        log (td.Log, optional): [description]. Defaults to None.
-        seasonal_diff (td.SeasonalDiff, optional): [description]. Defaults to None.
-        first_diff (td.FirstDiff, optional): [description]. Defaults to None.
+        boxcox (BoxCox, optional): [description]. Defaults to None.
+        log (Log, optional): [description]. Defaults to None.
+        seasonal_diff (SeasonalDiff, optional): [description]. Defaults to None.
+        first_diff (FirstDiff, optional): [description]. Defaults to None.
         reproduction (bool, optional): [description]. Defaults to False.
         precision_digits (int, optional): [description]. Defaults to 4.
         precision_method (str, optional): [description]. Defaults to 'significant'.
@@ -642,20 +927,51 @@ def spectral_density(dates: List[str], values: List[float], api_key: Union[str, 
         conversion (Union[None, str], optional): [description]. Defaults to None.
 
     Returns:
-        Union[td.TimedoorResponse, str]: [description]
+        Tuple[int, dict]: [description]
     """
-    if not set_api_key(api_key):
+    if not __set_api_key(api_key):
         return (400, {"message": 'api key was not provided!'})
 
-    values = clean_values(values=values, error_val=error_value)
+    values = __clean_values(values=values, error_val=error_value)
+    imputation_window = __validate_ma_window_size(imputation_window)
+    
+    url = BASE_URL+'spectral-density'
+    data = __convert_timeseries_to_data(dates=dates, values=values)
+    
+    # build json body
+    body = {
+        "method": method,
+        "taper": taper,
+        "center": center,
+        "conversion": conversion,
+        "reproduction": reproduction,
+        "precision": {
+            "digits": precision_digits,
+            "method": precision_method
+        },
+        "time_series": [
+            {
+                "data": data,
+                "imputation": {
+                    "method": imputation_method,
+                    "ma_window_size": imputation_window
+                },
+                "transformations": {
+                        "box_cox": boxcox.to_json(),
+                        "log": log.to_json(),
+                        "seasonal_diff": seasonal_diff.to_json(),
+                        "first_diff": first_diff.to_json()
+                }
+            }
+        ]
+    }
 
-    imputation_window = validate_ma_window_size(imputation_window)
-    pass
+    return __run_request(url=url, json_data=body)
 
 
 def spectral_entropy(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                      error_value: Union[int, None] = None,
-                     transformation: td.TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
+                     transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
                      precision_method: str = 'significant', method: str = 'direct', taper: str = 'rectangle', window_size: int = 10) -> Tuple[int, dict]:
 
     return spectral_entropy(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
@@ -666,7 +982,7 @@ def spectral_entropy(dates: List[str], values: List[float], api_key: Union[str, 
 
 def spectral_entropy(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                      error_value: Union[int, None] = None,
-                     boxcox: td.BoxCox = None, log: td.Log = None, seasonal_diff: td.SeasonalDiff = None, first_diff: td.FirstDiff = None,
+                     boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
                      reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant', method: str = 'direct',
                      taper: str = 'rectangle', window_size: int = 10) -> Tuple[int, dict]:
     """Spectral Analysis
@@ -683,10 +999,10 @@ def spectral_entropy(dates: List[str], values: List[float], api_key: Union[str, 
         api_key (Union[str, None], optional): [description]. Defaults to None.
         imputation_method (str, optional): [description]. Defaults to 'linear'.
         imputation_window (int, optional): [description]. Defaults to 10.
-        boxcox (td.BoxCox, optional): [description]. Defaults to None.
-        log (td.Log, optional): [description]. Defaults to None.
-        seasonal_diff (td.SeasonalDiff, optional): [description]. Defaults to None.
-        first_diff (td.FirstDiff, optional): [description]. Defaults to None.
+        boxcox (BoxCox, optional): [description]. Defaults to None.
+        log (Log, optional): [description]. Defaults to None.
+        seasonal_diff (SeasonalDiff, optional): [description]. Defaults to None.
+        first_diff (FirstDiff, optional): [description]. Defaults to None.
         reproduction (bool, optional): [description]. Defaults to False.
         precision_digits (int, optional): [description]. Defaults to 4.
         precision_method (str, optional): [description]. Defaults to 'significant'.
@@ -695,21 +1011,43 @@ def spectral_entropy(dates: List[str], values: List[float], api_key: Union[str, 
         window_size (int, optional): [description]. Defaults to 10.
 
     Returns:
-        Union[td.TimedoorResponse, str]: [description]
+        Tuple[int, dict]: [description]
     """
 
-    if not set_api_key(api_key):
+    if not __set_api_key(api_key):
         return (400, {"message": 'api key was not provided!'})
 
-    values = clean_values(values=values, error_val=error_value)
+    values = __clean_values(values=values, error_val=error_value)
+    imputation_window = __validate_ma_window_size(imputation_window)
+    
+    url = BASE_URL+'spectral-density'
+    data = __convert_timeseries_to_data(dates=dates, values=values)
+    
+    # build json body
+    body = {
+        "method": method,
+        "taper": taper,
+        "window_size": window_size,
+        "reproduction": reproduction,
+        "precision": {
+            "digits": precision_digits,
+            "method": precision_method
+        },
+        "time_series": [
+            {
+                "data": data,
+                "imputation": {
+                    "method": imputation_method,
+                    "ma_window_size": imputation_window
+                },
+                "transformations": {
+                        "box_cox": boxcox.to_json(),
+                        "log": log.to_json(),
+                        "seasonal_diff": seasonal_diff.to_json(),
+                        "first_diff": first_diff.to_json()
+                }
+            }
+        ]
+    }
 
-    imputation_window = validate_ma_window_size(imputation_window)
-    pass
-
-
-def main():
-    pass
-
-
-if __name__ == '__main__':
-    main()
+    return __run_request(url=url, json_data=body)
