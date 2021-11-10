@@ -1,19 +1,16 @@
-from typing import Union
+from typing import Optional, Union
+from dataclasses import dataclass
 
 # TODO make all objects JSON Seralizeable
+@dataclass
 class BoxCox:
-    def __init__(self, apply: bool = False, lam: Union[str, float] = 'auto',
-                 method: str = 'guerrero', upper: float = 2, lower: float = -1) -> None:
-        self.apply = apply
-        self.lam = lam
-        self.method = method.lower()
-        self.upper = upper
-        self.lower = lower
-        self.validate_inputs()
-        self.use_bounds = True
-        if self.lam != 'auto':
-            self.use_bounds = False
-
+    use_bounds: Optional[bool]
+    apply: bool = False
+    lam: Union[str, float] = 'auto'
+    method: str = 'guerrero'
+    upper: float = 2
+    lower: float = -1
+    
     def validate_inputs(self):
         if isinstance(self.lam, str):
             if self.lam.lower() != 'auto':
@@ -26,16 +23,13 @@ class BoxCox:
     def to_json(self):
         return self.__dict__
 
-
+@dataclass
 class Log:
-    def __init__(self, apply: bool = False, base: Union[str, int] = 'e',
-                 factor: Union[None, float] = 0.0001, constant: float = 1) -> None:
-        self.apply = apply
-        self.base = base
-        self.factor = factor
-        self.constant = constant
-        self.validate_inputs()
-
+    apply: bool = False
+    base: Union[str, int] = 'e'
+    factor: Optional[float] = 0.0001
+    constant: float = 1
+    
     def validate_inputs(self):
         if self.constant < 0.0001:
             self.constant = 0.0001
@@ -53,15 +47,13 @@ class Log:
         return self.__dict__
 
 
+@dataclass
 class SeasonalDiff:
-    def __init__(self, apply: bool = False, period: Union[str, int] = 'auto',
-                 n_diffs: Union[str, int] = 'auto', test: str = 'ss', alpha: float = 0.05) -> None:
-        self.apply = apply
-        self.period = period
-        self.n_diffs = n_diffs
-        self.test = test.lower()
-        self.alpha = alpha
-        self.validate_inputs()
+    apply: bool = False
+    period: Union[str, int] = 'auto'
+    n_diffs: Union[str, int] = 'auto'
+    test: str = 'ss'
+    alpha: float = 0.05
 
     def validate_inputs(self):
         if isinstance(self.period, str) and self.period != 'auto':
@@ -85,18 +77,14 @@ class SeasonalDiff:
     def to_json(self):
         return self.__dict__
 
-
+@dataclass
 class FirstDiff:
-    def __init__(self, apply: bool = False, period: Union[str, int] = 'auto',
-                 n_diffs: Union[str, int] = 'auto', test: str = 'kpss',
-                 diff_type: str = 'level', alpha: float = 0.05) -> None:
-        self.apply = apply
-        self.period = period
-        self.n_diffs = n_diffs
-        self.test = test.lower()
-        self.type = diff_type.lower()
-        self.alpha = alpha
-        self.validate_inputs()
+    apply: bool = False
+    period: Union[str, int] = 'auto'
+    n_diffs: Union[str, int] = 'auto'
+    test: str = 'kpss'
+    type: str = 'level'
+    alpha: float = 0.05
 
     def validate_inputs(self):
         if isinstance(self.period, str) and self.period != 'auto':
@@ -122,32 +110,10 @@ class FirstDiff:
     def to_json(self):
         return self.__dict__
 
-
+@dataclass
 class TimedoorTransformation:
-    def __init__(self, boxcox: BoxCox, log: Log, seasonal_diff: SeasonalDiff, first_diff: FirstDiff) -> None:
-        self.boxcox = boxcox
-        self.log = log
-        self.seasonal_diff = seasonal_diff
-        self.first_diff = first_diff
+    boxcox: BoxCox
+    log: Log
+    seasonal_diff: SeasonalDiff
+    first_diff: FirstDiff
 
-
-class TimedoorReproduction:
-    pass
-
-
-class TimedoorResponse:
-    def __init__(self, computation_time, reproduction = None, data = None) -> None:
-        self.computation_time: float = computation_time
-        self.reproduction: TimedoorReproduction = reproduction
-        self.data = data
-
-    def __str__(self) -> str:
-        return f'Response: {self.computation_time}, {self.reproduction}, {self.data}'
-
-
-def main():
-    pass
-
-
-if __name__ == '__main__':
-    main()
