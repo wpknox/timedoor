@@ -115,7 +115,7 @@ class TimedoorTransformation:
     first_diff: FirstDiff
 
 # global variables
-BASE_URL: str = 'https://api.timedoor.io/invocation/'
+BASE_URL: str = 'https://api.timedoor.io/invocation'
 API_HEADER_KEY = 'X-Time-Door-Key'
 HEADERS: dict = {}
 
@@ -126,7 +126,7 @@ def __run_request(url, json_data) -> Tuple[int, dict]:
 def __convert_timeseries_to_data(dates: List[str], values: List[float]) -> Dict[str, float]:
     return dict(zip(dates, values))
 
-def __clean_values(values, error_val: Union[int, float] = None) -> list:
+def __clean_values(values, error_val: Union[int, float, None] = None) -> list:
     if not error_val:
         return values
     return [value if value != error_val else None for value in values]
@@ -136,7 +136,7 @@ def __validate_ma_window_size(size: int):
         return 2
     return size
 
-def __set_api_key(key: str) -> bool:
+def __set_api_key(key: Union[str, None]) -> bool:
     """Sets the api key for the user if it has not been set already
 
     Args:
@@ -193,7 +193,7 @@ def auto_arima(dates: List[str], values: List[float], api_key: Union[str, None] 
     values = __clean_values(values=values, error_val=error_value)
     imputation_window = __validate_ma_window_size(imputation_window)
 
-    url = BASE_URL + 'auto-arima'
+    url = f"{BASE_URL}/auto-arima"
     data = __convert_timeseries_to_data(dates=dates, values=values)
 
     # build json body
@@ -229,19 +229,10 @@ def auto_arima(dates: List[str], values: List[float], api_key: Union[str, None] 
     return __run_request(url=url, json_data=body)
 
 
-def changepoint_detection(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
-                          error_value: Union[int, None] = None, transformation: TimedoorTransformation = None, reproduction: bool = False,
-                          precision_digits: int = 4, precision_method: str = 'significant', penalty: str = 'mbic', min_distance: int = 1) -> Tuple[int, dict]:
-
-    return changepoint_detection(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
-                                 boxcox=transformation.boxcox, log=transformation.log, seasonal_diff=transformation.seasonal_diff,
-                                 first_diff=transformation.first_diff, reproduction=reproduction, precision_digits=precision_digits,
-                                 precision_method=precision_method, penalty=penalty, min_distance=min_distance)
-
-
-def changepoint_detection(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
-                          error_value: Union[int, None] = None, boxcox: BoxCox = BoxCox(), log: Log = Log(),
-                          seasonal_diff: SeasonalDiff = SeasonalDiff(), first_diff: FirstDiff = FirstDiff(),
+def changepoint_detection(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear',
+                          imputation_window: int = 10, error_value: Union[int, None] = None,
+                          boxcox: Union[BoxCox, None] = None, log: Union[Log, None] = None,
+                          seasonal_diff: Union[SeasonalDiff, None] = None, first_diff: Union[FirstDiff, None] = None,
                           reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant',
                           penalty: str = 'mbic', min_distance: int = 1) -> Tuple[int, dict]:
     """Changepoint Detection
@@ -278,8 +269,13 @@ def changepoint_detection(dates: List[str], values: List[float], api_key: Union[
     values = __clean_values(values=values, error_val=error_value)
     imputation_window = __validate_ma_window_size(imputation_window)
 
-    url = BASE_URL+'changepoint-detection'
+    url = f"{BASE_URL}/changepoint-detection"
     data = __convert_timeseries_to_data(dates=dates, values=values)
+
+    boxcox_str = boxcox.to_json() if boxcox else None
+    log_str = log.to_json() if log else None
+    seasonal_diff_str = seasonal_diff.to_json() if seasonal_diff else None
+    first_diff_str = first_diff.to_json() if first_diff else None
 
     # build json body
     body = {
@@ -298,10 +294,10 @@ def changepoint_detection(dates: List[str], values: List[float], api_key: Union[
                     "ma_window_size": imputation_window
                 },
                 "transformations": {
-                        "box_cox": boxcox.to_json(),
-                        "log": log.to_json(),
-                        "seasonal_diff": seasonal_diff.to_json(),
-                        "first_diff": first_diff.to_json()
+                        "box_cox": boxcox_str,
+                        "log": log_str,
+                        "seasonal_diff": seasonal_diff_str,
+                        "first_diff": first_diff_str
                 }
             }
         ]
@@ -309,21 +305,11 @@ def changepoint_detection(dates: List[str], values: List[float], api_key: Union[
 
     return __run_request(url=url, json_data=body)
 
-
-def collective_and_point_anomalies(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
+def collective_and_point_anomalies(dates: List[str], values: List[float], api_key: Union[str, None] = None,
+                                   imputation_method: str = 'linear', imputation_window: int = 10,
                                    error_value: Union[int, None] = None,
-                                   transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
-                                   precision_method: str = 'significant', method: str = 'mean_var', min_ca_size: int = 10) -> Tuple[int, dict]:
-
-    return collective_and_point_anomalies(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
-                                          boxcox=transformation.boxcox, log=transformation.log, seasonal_diff=transformation.seasonal_diff,
-                                          first_diff=transformation.first_diff, reproduction=reproduction, precision_digits=precision_digits,
-                                          precision_method=precision_method, method=method, min_ca_size=min_ca_size)
-
-
-def collective_and_point_anomalies(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
-                                   error_value: Union[int, None] = None,
-                                   boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
+                                   boxcox: Union[BoxCox, None] = None, log: Union[Log, None] = None,
+                                   seasonal_diff: Union[SeasonalDiff, None] = None, first_diff: Union[FirstDiff, None] = None,
                                    reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant',
                                    method: str = 'mean_var', min_ca_size: int = 10) -> Tuple[int, dict]:
     """Anomaly Detection
@@ -359,9 +345,14 @@ def collective_and_point_anomalies(dates: List[str], values: List[float], api_ke
     values = __clean_values(values=values, error_val=error_value)
     imputation_window = __validate_ma_window_size(imputation_window)
     
-    url = BASE_URL+'collective-and-point-anomalies'
+    url = f"{BASE_URL}/collective-and-point-anomalies"
     data = __convert_timeseries_to_data(dates=dates, values=values)
-    
+
+    boxcox_str = boxcox.to_json() if boxcox else None
+    log_str = log.to_json() if log else None
+    seasonal_diff_str = seasonal_diff.to_json() if seasonal_diff else None
+    first_diff_str = first_diff.to_json() if first_diff else None
+
     # build json body
     body = {
         "method": method,
@@ -379,10 +370,10 @@ def collective_and_point_anomalies(dates: List[str], values: List[float], api_ke
                     "ma_window_size": imputation_window
                 },
                 "transformations": {
-                        "box_cox": boxcox.to_json(),
-                        "log": log.to_json(),
-                        "seasonal_diff": seasonal_diff.to_json(),
-                        "first_diff": first_diff.to_json()
+                        "box_cox": boxcox_str,
+                        "log": log_str,
+                        "seasonal_diff": seasonal_diff_str,
+                        "first_diff": first_diff_str
                 }
             }
         ]
@@ -393,18 +384,8 @@ def collective_and_point_anomalies(dates: List[str], values: List[float], api_ke
 
 def conditional_heteroskedasticity(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear',
                                    imputation_window: int = 10, error_value: Union[int, None] = None,
-                                   transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
-                                   precision_method: str = 'significant', alpha: float = 0.05, window_size: int = 10) -> Tuple[int, dict]:
-
-    return conditional_heteroskedasticity(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window,
-                                          error_value=error_value, boxcox=transformation.boxcox, log=transformation.log,
-                                          seasonal_diff=transformation.seasonal_diff, first_diff=transformation.first_diff, reproduction=reproduction,
-                                          precision_digits=precision_digits, precision_method=precision_method, alpha=alpha, window_size=window_size)
-
-
-def conditional_heteroskedasticity(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear',
-                                   imputation_window: int = 10, error_value: Union[int, None] = None,
-                                   boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
+                                   boxcox: Union[BoxCox, None] = None, log: Union[Log, None] = None,
+                                   seasonal_diff: Union[SeasonalDiff, None] = None, first_diff: Union[FirstDiff, None] = None,
                                    reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant',
                                    alpha: float = 0.05, window_size: int = 10) -> Tuple[int, dict]:
     """Early Warning Signal Detection
@@ -444,9 +425,14 @@ def conditional_heteroskedasticity(dates: List[str], values: List[float], api_ke
     values = __clean_values(values=values, error_val=error_value)
     imputation_window = __validate_ma_window_size(imputation_window)
     
-    url = BASE_URL+'conditional-heteroskedasticity'
+    url = f"{BASE_URL}/conditional-heteroskedasticity"
     data = __convert_timeseries_to_data(dates=dates, values=values)
     
+    boxcox_str = boxcox.to_json() if boxcox else None
+    log_str = log.to_json() if log else None
+    seasonal_diff_str = seasonal_diff.to_json() if seasonal_diff else None
+    first_diff_str = first_diff.to_json() if first_diff else None
+
     # build json body
     body = {
         "alpha": alpha,
@@ -464,10 +450,10 @@ def conditional_heteroskedasticity(dates: List[str], values: List[float], api_ke
                     "ma_window_size": imputation_window
                 },
                 "transformations": {
-                        "box_cox": boxcox.to_json(),
-                        "log": log.to_json(),
-                        "seasonal_diff": seasonal_diff.to_json(),
-                        "first_diff": first_diff.to_json()
+                        "box_cox": boxcox_str,
+                        "log": log_str,
+                        "seasonal_diff": seasonal_diff_str,
+                        "first_diff": first_diff_str
                 }
             }
         ]
@@ -478,18 +464,8 @@ def conditional_heteroskedasticity(dates: List[str], values: List[float], api_ke
 
 def drift_diffusion_jump(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                          error_value: Union[int, None] = None,
-                         transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
-                         precision_method: str = 'significant', kernel_bandwidth_factor: float = 0.6, kernel_points: int = 500) -> Tuple[int, dict]:
-
-    return drift_diffusion_jump(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
-                                boxcox=transformation.boxcox, log=transformation.log, seasonal_diff=transformation.seasonal_diff, first_diff=transformation.first_diff,
-                                reproduction=reproduction, precision_digits=precision_digits, precision_method=precision_method,
-                                kernel_bandwidth_factor=kernel_bandwidth_factor, kernel_points=kernel_points)
-
-
-def drift_diffusion_jump(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
-                         error_value: Union[int, None] = None,
-                         boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
+                         boxcox: Union[BoxCox, None] = None, log: Union[Log, None] = None,
+                         seasonal_diff: Union[SeasonalDiff, None] = None, first_diff: Union[FirstDiff, None] = None,
                          reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant',
                          kernel_bandwidth_factor: float = 0.6, kernel_points: int = 500) -> Tuple[int, dict]:
     """Early Warning Signal Detection
@@ -532,9 +508,14 @@ def drift_diffusion_jump(dates: List[str], values: List[float], api_key: Union[s
     values = __clean_values(values=values, error_val=error_value)
     imputation_window = __validate_ma_window_size(imputation_window)
 
-    url = BASE_URL+'drift-diffusion-jump'
+    url = f"{BASE_URL}/drift-diffusion-jump"
     data = __convert_timeseries_to_data(dates=dates, values=values)
     
+    boxcox_str = boxcox.to_json() if boxcox else None
+    log_str = log.to_json() if log else None
+    seasonal_diff_str = seasonal_diff.to_json() if seasonal_diff else None
+    first_diff_str = first_diff.to_json() if first_diff else None
+
     # build json body
     body = {
         "kernel_bandwidth_factor": kernel_bandwidth_factor,
@@ -552,10 +533,10 @@ def drift_diffusion_jump(dates: List[str], values: List[float], api_key: Union[s
                     "ma_window_size": imputation_window
                 },
                 "transformations": {
-                        "box_cox": boxcox.to_json(),
-                        "log": log.to_json(),
-                        "seasonal_diff": seasonal_diff.to_json(),
-                        "first_diff": first_diff.to_json()
+                        "box_cox": boxcox_str,
+                        "log": log_str,
+                        "seasonal_diff": seasonal_diff_str,
+                        "first_diff": first_diff_str
                 }
             }
         ]
@@ -566,18 +547,8 @@ def drift_diffusion_jump(dates: List[str], values: List[float], api_key: Union[s
 
 def early_warning_signals(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                           error_value: Union[int, None] = None,
-                          transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
-                          precision_method: str = 'significant', method: str = 'acf1', window_size: int = 10) -> Tuple[int, dict]:
-
-    return early_warning_signals(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
-                                 boxcox=transformation.boxcox, log=transformation.log, seasonal_diff=transformation.seasonal_diff,
-                                 first_diff=transformation.first_diff, reproduction=reproduction, precision_digits=precision_digits,
-                                 precision_method=precision_method, method=method, window_size=window_size)
-
-
-def early_warning_signals(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
-                          error_value: Union[int, None] = None,
-                          boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
+                          boxcox: Union[BoxCox, None] = None, log: Union[Log, None] = None,
+                          seasonal_diff: Union[SeasonalDiff, None] = None, first_diff: Union[FirstDiff, None] = None,
                           reproduction: bool = False, precision_digits: int = 4,
                           precision_method: str = 'significant', method: str = 'acf1', window_size: int = 10) -> Tuple[int, dict]:
     """Early Warning Signal Detection
@@ -614,9 +585,14 @@ def early_warning_signals(dates: List[str], values: List[float], api_key: Union[
     values = __clean_values(values=values, error_val=error_value)
     imputation_window = __validate_ma_window_size(imputation_window)
 
-    url = BASE_URL+'early-warning-signals'
+    url = f"{BASE_URL}/early-warning-signals"
     data = __convert_timeseries_to_data(dates=dates, values=values)
     
+    boxcox_str = boxcox.to_json() if boxcox else None
+    log_str = log.to_json() if log else None
+    seasonal_diff_str = seasonal_diff.to_json() if seasonal_diff else None
+    first_diff_str = first_diff.to_json() if first_diff else None
+
     # build json body
     body = {
         "method": method,
@@ -634,10 +610,10 @@ def early_warning_signals(dates: List[str], values: List[float], api_key: Union[
                     "ma_window_size": imputation_window
                 },
                 "transformations": {
-                        "box_cox": boxcox.to_json(),
-                        "log": log.to_json(),
-                        "seasonal_diff": seasonal_diff.to_json(),
-                        "first_diff": first_diff.to_json()
+                    "box_cox": boxcox_str,
+                    "log": log_str,
+                    "seasonal_diff": seasonal_diff_str,
+                    "first_diff": first_diff_str
                 }
             }
         ]
@@ -646,20 +622,11 @@ def early_warning_signals(dates: List[str], values: List[float], api_key: Union[
     return __run_request(url=url, json_data=body)
 
 
-def granger_causality(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
+def granger_causality(dates: List[str], x_values: List[float], y_values: List[float], api_key: Union[str, None] = None,
+                      imputation_method: str = 'linear', imputation_window: int = 10,
                       error_value: Union[int, None] = None,
-                      transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
-                      precision_method: str = 'significant', alpha: float = 0.05, gamma: float = 0.5) -> Tuple[int, dict]:
-
-    return granger_causality(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
-                             boxcox=transformation.boxcox, log=transformation.log, seasonal_diff=transformation.seasonal_diff,
-                             first_diff=transformation.first_diff, reproduction=reproduction, precision_digits=precision_digits,
-                             precision_method=precision_method, alpha=alpha, gamma=gamma)
-
-
-def granger_causality(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
-                      error_value: Union[int, None] = None,
-                      boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
+                      boxcox: Union[BoxCox, None] = None, log: Union[Log, None] = None,
+                      seasonal_diff: Union[SeasonalDiff, None] = None, first_diff: Union[FirstDiff, None] = None,
                       reproduction: bool = False, precision_digits: int = 4,
                       precision_method: str = 'significant', alpha: float = 0.05, gamma: float = 0.5) -> Tuple[int, dict]:
     """Causality Inference
@@ -674,7 +641,8 @@ def granger_causality(dates: List[str], values: List[float], api_key: Union[str,
 
     Args:
         dates (List[str]): [description]
-        values (List[float]): [description]
+        x_values (List[float]): [description]
+        y_values (List[float]): [description]
         api_key (Union[str, None], optional): [description]. Defaults to None.
         imputation_method (str, optional): [description]. Defaults to 'linear'.
         imputation_window (int, optional): [description]. Defaults to 10.
@@ -692,35 +660,65 @@ def granger_causality(dates: List[str], values: List[float], api_key: Union[str,
         Tuple[int, dict]: [description]
     """
 
-    # TODO: Fix this method... uses two data sets not one...
-
     if not __set_api_key(api_key):
         return (400, {"message": 'api key was not provided!'})
 
-    values = __clean_values(values=values, error_val=error_value)
+    x_values = __clean_values(values=x_values, error_val=error_value)
+    y_values = __clean_values(values=y_values, error_val=error_value)
     imputation_window = __validate_ma_window_size(imputation_window)
 
-    pass
+    url = f"{BASE_URL}/granger-causality"
+    x_data = __convert_timeseries_to_data(dates=dates, values=x_values)
+    y_data = __convert_timeseries_to_data(dates=dates, values=y_values)
+
+    boxcox_str = boxcox.to_json() if boxcox else None
+    log_str = log.to_json() if log else None
+    seasonal_diff_str = seasonal_diff.to_json() if seasonal_diff else None
+    first_diff_str = first_diff.to_json() if first_diff else None
+
+    body = {
+        "reproduction": reproduction,
+        "precision": {
+            "digits": precision_digits,
+            "method": precision_method
+        },
+        "time_series": [
+            {
+                "data": y_data,
+                "imputation": {
+                    "method": imputation_method,
+                    "ma_window_size": imputation_window
+                },
+                "transformations": {
+                    "box_cox": boxcox_str,
+                    "log": log_str,
+                    "seasonal_diff": seasonal_diff_str,
+                    "first_diff": first_diff_str
+                }
+            },
+            {
+                "data": x_data,
+                "imputation": {
+                    "method": imputation_method,
+                    "ma_window_size": imputation_window
+                },
+                "transformations": {
+                    "box_cox": boxcox_str,
+                    "log": log_str,
+                    "seasonal_diff": seasonal_diff_str,
+                    "first_diff": first_diff_str
+                }
+            }
+        ]
+    }
+
+    return __run_request(url=url, json_data=body)
 
 
 def matrix_profile(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                    error_value: Union[int, None] = None,
-                   transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
-                   precision_method: str = 'significant', method: str = 'stomp', window_size: int = 10, exclusion_factor: float = 0.5,
-                   neighbor_exclusion_radius: int = 3, n_motifs: int = 3, n_motifs_neighbors: int = 10,
-                   n_discords: int = 1, n_discord_neighbors: int = 3) -> Tuple[int, dict]:
-
-    return matrix_profile(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
-                          boxcox=transformation.boxcox, log=transformation.log, seasonal_diff=transformation.seasonal_diff,
-                          first_diff=transformation.first_diff, reproduction=reproduction, precision_digits=precision_digits,
-                          precision_method=precision_method, method=method, window_size=window_size, exclusion_factor=exclusion_factor,
-                          neighbor_exclusion_radius=neighbor_exclusion_radius, n_motifs=n_motifs,
-                          n_motifs_neighbors=n_motifs_neighbors, n_discords=n_discords, n_discord_neighbors=n_discord_neighbors)
-
-
-def matrix_profile(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
-                   error_value: Union[int, None] = None,
-                   boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
+                   boxcox: Union[BoxCox, None] = None, log: Union[Log, None] = None,
+                   seasonal_diff: Union[SeasonalDiff, None] = None, first_diff: Union[FirstDiff, None] = None,
                    reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant', method: str = 'stomp', window_size: int = 10,
                    exclusion_factor: float = 0.5, neighbor_exclusion_radius: int = 3, n_motifs: int = 3, n_motifs_neighbors: int = 10,
                    n_discords: int = 1, n_discord_neighbors: int = 3) -> Tuple[int, dict]:
@@ -765,9 +763,14 @@ def matrix_profile(dates: List[str], values: List[float], api_key: Union[str, No
     values = __clean_values(values=values, error_val=error_value)
     imputation_window = __validate_ma_window_size(imputation_window)
     
-    url = BASE_URL+'matrix-profile'
+    url = f"{BASE_URL}/matrix-profile"
     data = __convert_timeseries_to_data(dates=dates, values=values)
     
+    boxcox_str = boxcox.to_json() if boxcox else None
+    log_str = log.to_json() if log else None
+    seasonal_diff_str = seasonal_diff.to_json() if seasonal_diff else None
+    first_diff_str = first_diff.to_json() if first_diff else None
+
     # build json body
     body = {
         "method": method,
@@ -791,10 +794,10 @@ def matrix_profile(dates: List[str], values: List[float], api_key: Union[str, No
                     "ma_window_size": imputation_window
                 },
                 "transformations": {
-                        "box_cox": boxcox.to_json(),
-                        "log": log.to_json(),
-                        "seasonal_diff": seasonal_diff.to_json(),
-                        "first_diff": first_diff.to_json()
+                        "box_cox": boxcox_str,
+                        "log": log_str,
+                        "seasonal_diff": seasonal_diff_str,
+                        "first_diff": first_diff_str
                 }
             }
         ]
@@ -802,22 +805,10 @@ def matrix_profile(dates: List[str], values: List[float], api_key: Union[str, No
 
     return __run_request(url=url, json_data=body)
 
-
 def serial_dependence(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                       error_value: Union[int, None] = None,
-                      transformation: TimedoorTransformation = None, reproduction: bool = False,
-                      precision_digits: int = 4, precision_method: str = 'significant', method: str = 'acf',
-                      max_lag: Union[str, float] = '10*10log10(n)', alpha: float = 0.05) -> Tuple[int, dict]:
-
-    return serial_dependence(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
-                             boxcox=transformation.boxcox, log=transformation.log, seasonal_diff=transformation.seasonal_diff,
-                             first_diff=transformation.first_diff, reproduction=reproduction, precision_digits=precision_digits,
-                             precision_method=precision_method, method=method, max_lag=max_lag, alpha=alpha)
-
-
-def serial_dependence(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
-                      error_value: Union[int, None] = None,
-                      boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
+                      boxcox: Union[BoxCox, None] = None, log: Union[Log, None] = None,
+                      seasonal_diff: Union[SeasonalDiff, None] = None, first_diff: Union[FirstDiff, None] = None,
                       reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant', method: str = 'acf',
                       max_lag: Union[str, float] = '10*10log10(n)', alpha: float = 0.05) -> Tuple[int, dict]:
     """Serial Dependency Detection
@@ -852,9 +843,14 @@ def serial_dependence(dates: List[str], values: List[float], api_key: Union[str,
     values = __clean_values(values=values, error_val=error_value)
     imputation_window = __validate_ma_window_size(imputation_window)
 
-    url = BASE_URL+'serial-dependence'
+    url = f"{BASE_URL}/serial-dependence"
     data = __convert_timeseries_to_data(dates=dates, values=values)
     
+    boxcox_str = boxcox.to_json() if boxcox else None
+    log_str = log.to_json() if log else None
+    seasonal_diff_str = seasonal_diff.to_json() if seasonal_diff else None
+    first_diff_str = first_diff.to_json() if first_diff else None
+
     # build json body
     body = {
         "method": method,
@@ -873,10 +869,10 @@ def serial_dependence(dates: List[str], values: List[float], api_key: Union[str,
                     "ma_window_size": imputation_window
                 },
                 "transformations": {
-                        "box_cox": boxcox.to_json(),
-                        "log": log.to_json(),
-                        "seasonal_diff": seasonal_diff.to_json(),
-                        "first_diff": first_diff.to_json()
+                        "box_cox": boxcox_str,
+                        "log": log_str,
+                        "seasonal_diff": seasonal_diff_str,
+                        "first_diff": first_diff_str
                 }
             }
         ]
@@ -884,22 +880,10 @@ def serial_dependence(dates: List[str], values: List[float], api_key: Union[str,
 
     return __run_request(url=url, json_data=body)
 
-
 def spectral_density(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                      error_value: Union[int, None] = None,
-                     transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
-                     precision_method: str = 'significant', method: str = 'direct', taper: str = 'rectangle',
-                     center: bool = True, conversion: Union[None, str] = None) -> Tuple[int, dict]:
-
-    return spectral_density(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
-                            boxcox=transformation.boxcox, log=transformation.log, seasonal_diff=transformation.seasonal_diff,
-                            first_diff=transformation.first_diff, reproduction=reproduction, precision_digits=precision_digits,
-                            precision_method=precision_method, method=method, taper=taper, center=center, conversion=conversion)
-
-
-def spectral_density(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
-                     error_value: Union[int, None] = None,
-                     boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
+                     boxcox: Union[BoxCox, None] = None, log: Union[Log, None] = None,
+                     seasonal_diff: Union[SeasonalDiff, None] = None, first_diff: Union[FirstDiff, None] = None,
                      reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant', method: str = 'direct',
                      taper: str = 'rectangle', center: bool = True, conversion: Union[None, str] = None) -> Tuple[int, dict]:
     """Spectral Analysis
@@ -935,9 +919,14 @@ def spectral_density(dates: List[str], values: List[float], api_key: Union[str, 
     values = __clean_values(values=values, error_val=error_value)
     imputation_window = __validate_ma_window_size(imputation_window)
     
-    url = BASE_URL+'spectral-density'
+    url = f"{BASE_URL}/spectral-density"
     data = __convert_timeseries_to_data(dates=dates, values=values)
     
+    boxcox_str = boxcox.to_json() if boxcox else None
+    log_str = log.to_json() if log else None
+    seasonal_diff_str = seasonal_diff.to_json() if seasonal_diff else None
+    first_diff_str = first_diff.to_json() if first_diff else None
+
     # build json body
     body = {
         "method": method,
@@ -957,10 +946,10 @@ def spectral_density(dates: List[str], values: List[float], api_key: Union[str, 
                     "ma_window_size": imputation_window
                 },
                 "transformations": {
-                        "box_cox": boxcox.to_json(),
-                        "log": log.to_json(),
-                        "seasonal_diff": seasonal_diff.to_json(),
-                        "first_diff": first_diff.to_json()
+                        "box_cox": boxcox_str,
+                        "log": log_str,
+                        "seasonal_diff": seasonal_diff_str,
+                        "first_diff": first_diff_str
                 }
             }
         ]
@@ -968,21 +957,10 @@ def spectral_density(dates: List[str], values: List[float], api_key: Union[str, 
 
     return __run_request(url=url, json_data=body)
 
-
 def spectral_entropy(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
                      error_value: Union[int, None] = None,
-                     transformation: TimedoorTransformation = None, reproduction: bool = False, precision_digits: int = 4,
-                     precision_method: str = 'significant', method: str = 'direct', taper: str = 'rectangle', window_size: int = 10) -> Tuple[int, dict]:
-
-    return spectral_entropy(dates=dates, values=values, api_key=api_key, imputation_method=imputation_method, imputation_window=imputation_window, error_value=error_value,
-                            boxcox=transformation.boxcox, log=transformation.log, seasonal_diff=transformation.seasonal_diff,
-                            first_diff=transformation.first_diff, reproduction=reproduction, precision_digits=precision_digits,
-                            precision_method=precision_method, method=method, taper=taper, window_size=window_size)
-
-
-def spectral_entropy(dates: List[str], values: List[float], api_key: Union[str, None] = None, imputation_method: str = 'linear', imputation_window: int = 10,
-                     error_value: Union[int, None] = None,
-                     boxcox: BoxCox = None, log: Log = None, seasonal_diff: SeasonalDiff = None, first_diff: FirstDiff = None,
+                     boxcox: Union[BoxCox, None] = None, log: Union[Log, None] = None,
+                     seasonal_diff: Union[SeasonalDiff, None] = None, first_diff: Union[FirstDiff, None] = None,
                      reproduction: bool = False, precision_digits: int = 4, precision_method: str = 'significant', method: str = 'direct',
                      taper: str = 'rectangle', window_size: int = 10) -> Tuple[int, dict]:
     """Spectral Analysis
@@ -1020,9 +998,14 @@ def spectral_entropy(dates: List[str], values: List[float], api_key: Union[str, 
     values = __clean_values(values=values, error_val=error_value)
     imputation_window = __validate_ma_window_size(imputation_window)
     
-    url = BASE_URL+'spectral-density'
+    url = f"{BASE_URL}/spectral-entropy"
     data = __convert_timeseries_to_data(dates=dates, values=values)
     
+    boxcox_str = boxcox.to_json() if boxcox else None
+    log_str = log.to_json() if log else None
+    seasonal_diff_str = seasonal_diff.to_json() if seasonal_diff else None
+    first_diff_str = first_diff.to_json() if first_diff else None
+
     # build json body
     body = {
         "method": method,
@@ -1041,10 +1024,10 @@ def spectral_entropy(dates: List[str], values: List[float], api_key: Union[str, 
                     "ma_window_size": imputation_window
                 },
                 "transformations": {
-                        "box_cox": boxcox.to_json(),
-                        "log": log.to_json(),
-                        "seasonal_diff": seasonal_diff.to_json(),
-                        "first_diff": first_diff.to_json()
+                        "box_cox": boxcox_str,
+                        "log": log_str,
+                        "seasonal_diff": seasonal_diff_str,
+                        "first_diff": first_diff_str
                 }
             }
         ]
