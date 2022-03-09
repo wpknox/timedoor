@@ -1,3 +1,0 @@
-all data was obtained from <https://archive-beta.ics.uci.edu/>
-
-data is used soley for testing the API calls. No real analysis is actually done ;)

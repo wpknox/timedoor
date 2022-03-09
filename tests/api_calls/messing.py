@@ -1,12 +1,12 @@
 # Author - Willis Knox
 import sys
-sys.path.append('../')
+sys.path.append('../../')
+from decouple import config
 from datetime import datetime
-import timedoor.timedoor as timedoor
-from env.key import key
+import  src.timedoor.timedoor as timedoor
 import pandas as pd
 
-api_key = key
+api_key = str(config('KEY'))
 
 
 def try_arima():

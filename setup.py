@@ -1,1 +1,8 @@
-# idk what to do here... will fill out more later
+# import setuptools
+
+# with open('README.md', 'r', encoding='utf-8') as f:
+#     long_description = f.read()
+
+# setuptools.setup(
+
+# )
