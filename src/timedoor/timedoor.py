@@ -200,8 +200,8 @@ def auto_arima(dates: List[str], values: List[float], api_key: Union[str, None] 
     body = {
         "stepwise": stepwise,
         "approximation": approximation,
-        "seasonal": seasonal,
         "non_stationary": non_stationary,
+        "seasonal": seasonal,
         "ic": ic,
         "box_cox_lambda": box_cox_lambda,
         "bias_adj": bias_adj,
